@@ -1,1 +1,4 @@
 .vscode/
+_install/
+nvme0n1.img
+nvme1n1.img

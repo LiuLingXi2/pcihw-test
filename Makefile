@@ -22,10 +22,14 @@ boot:
 		-initrd rootfs.img \
 		-nographic
 
-.PHONY: initramfs
+.PHONY: initramfs _install
 initramfs:
 	cd ./initramfs && find . -print0 | cpio -ov --null --format=newc | gzip -9 > ../rootfs.img
 	@echo "create initramfs success!"
+
+_install:
+	cd ./_install && find . -print0 | cpio -ov --null --format=newc | gzip -9 > ../rootfs.img
+	@echo "create _install success!"
 
 nvme:
 	# qemu-img create -f raw nvme0n1.img 10G
