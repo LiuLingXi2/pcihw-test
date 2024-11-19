@@ -1,0 +1,14 @@
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+
+insmod /lib/modules/nvme-core.ko
+insmod /lib/modules/nvme.ko
+
+mount /dev/nvme0n1p1 /mnt/nvme0n1p1
+mount /dev/nvme1n1p1 /mnt/nvme1n1p1
+
+echo "done"
