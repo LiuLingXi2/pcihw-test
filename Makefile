@@ -1,11 +1,10 @@
-obj-m += self.o
-
 CFLAGS := -Werror -Wall -Wno-unused-variable
 
 all: module initramfs boot
 
 module:
-	make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -C /home/ubuntu/liuhao/linux-5.14.5 M=$(PWD) modules
+	make -Ccmodule mdl
+	@echo "module compile success!"
 
 boot:
 	qemu-system-aarch64 \
@@ -27,9 +26,9 @@ initramfs:
 	cd ./initramfs && find . -print0 | cpio -ov --null --format=newc | gzip -9 > ../rootfs.img
 	@echo "create initramfs success!"
 
-_install:
-	cd ./_install && find . -print0 | cpio -ov --null --format=newc | gzip -9 > ../rootfs.img
-	@echo "create _install success!"
+fsinstall:
+	cd ./fsinstall && find . -print0 | cpio -ov --null --format=newc | gzip -9 > ../rootfs.img
+	@echo "create fsinstall success!"
 
 nvme:
 	# qemu-img create -f raw nvme0n1.img 10G
@@ -39,7 +38,6 @@ nvme:
 	sudo parted /dev/loop0 print
 	@echo "y" | sudo mkfs.ext4 /dev/loop0p1
 	sudo losetup -d /dev/loop0
-
 	sudo losetup --find --show nvme1n1.img
 	@echo "Yes" | sudo parted /dev/loop0 mklabel gpt
 	sudo parted /dev/loop0 mkpart primary ext4 0% 100%
