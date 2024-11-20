@@ -26,6 +26,7 @@ initramfs:
 	cd ./initramfs && find . -print0 | cpio -ov --null --format=newc | gzip -9 > ../rootfs.img
 	@echo "create initramfs success!"
 
+.PHONY: fsinstall
 fsinstall:
 	cd ./fsinstall && find . -print0 | cpio -ov --null --format=newc | gzip -9 > ../rootfs.img
 	@echo "create fsinstall success!"
