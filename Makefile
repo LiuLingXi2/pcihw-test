@@ -3,7 +3,9 @@ CFLAGS := -Werror -Wall -Wno-unused-variable
 all: module initramfs boot
 
 module:
+	make -Ccmodule clean
 	make -Ccmodule mdl
+	cp -r cmodule/*.ko fsinstall/home/
 	@echo "module compile success!"
 
 boot:

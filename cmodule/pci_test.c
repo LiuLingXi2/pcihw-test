@@ -12,8 +12,8 @@ MODULE_VERSION("1.0");
 static int __init pci_init(void)
 {
     struct pci_dev *dev = NULL;
-    unsigned char configure_space[64];
-    int ret;
+    // unsigned char configure_space[64];
+    // int ret;
 
     for_each_pci_dev(dev) {
         if (dev && dev->bus && dev->devfn)
