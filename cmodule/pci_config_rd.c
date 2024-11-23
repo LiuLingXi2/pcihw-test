@@ -2,11 +2,14 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/io.h>
 
 MODULE_LICENSE("GPL");                
 MODULE_AUTHOR("LiuHao");         
 MODULE_DESCRIPTION("liuhao kernel module running ...");
 MODULE_VERSION("1.0"); 
+
+#define MSI_X_ENTRY_SIZE 16
 
 typedef struct {
     u16  vendor_id;
@@ -42,47 +45,110 @@ typedef struct {
 
 enum CapabilityID {
     default_id = 0,
+    PMI = 0x1,
+    MSI = 0x5,
+    PCII = 0x10,
     MSI_X = 0x11,
-    ASPM, PM
+    ASPM
 };
 
-static g_capability_addr;
+struct msi_entry {
+    u8 lower_addr;
+    u8 upper_addr;
+    u8 vector_data;
+    u8 vector_control;
+};
 
-static u8 parse_msi_x_structure(void)
+struct msi_entry *g_msi_table[65];
+
+static u8 parse_pmi_structure(struct pci_dev *pdev, u8 pointer_addr)
+{
+    return 0;
+}
+
+static u8 parse_pcii_structure(struct pci_dev *pdev, u8 pointer_addr)
+{
+    return 0;
+}
+
+/**
+ * @brief msi-x structure parse
+ * 
+ * @param [in] pdev  device info
+ * @param [in] pointer_addr current capability structure address
+ * 
+ * @return u8 next capability id 
+ */
+static u8 parse_msi_x_structure(struct pci_dev *pdev, u8 pointer_addr)
 {
     struct msi_capability {
         u8  capability_id;
         u8  next_cap_ptr;
         u16 message_control;
-        u8  max_x_table_bar_indicator;
-        u8  tba;
-        u16 tba2;
-        u8  msi_x_pending_bit_array_bar_indicator;
-        u16 pba;
-        u8  pba2;
+        u8  tbl_bir_35;
+        u8  tbl0;
+        u16 tbl1;
+        u8  pba_bir_35;
+        u8  pba0;
+        u16 pba1;
     };
 
-    u8 config_space[12];
+    u8 msi_x_capability[12], next_capability_id;
     int ret, i;
     struct msi_capability *mc;
+    void __iomem *bar_addr;
+    u32 msi_x_size, lower_addr, upper_addr;
+    u32 tbl_addr_offset, pba_addr_offset;
+    u32 *msi_x_entry;
 
-    pdev = pci_get_domain_bus_and_slot(0, 1, PCI_DEVFN(5, 0));
-    if (pdev == NULL) {
-        pr_info("pci_get_domain_bus_and_slot error!\n");
-        return -1;
-    }
+    pr_info("%s: pointer_addr: 0x%02x\n", __FUNCTION__, pointer_addr);
 
-    pr_info("%s: g_capability_addr: 0x%02x\n", __FUNCTION__, g_capability_addr);
-
-    for (i = 0; i < sizeof(config_space); i ++) {
-        ret = pci_read_config_byte(pdev, g_capability_addr ++ , &config_space[i]);
+    for (i = 0; i < sizeof(msi_x_capability); i ++) {
+        ret = pci_read_config_byte(pdev, pointer_addr ++ , &msi_x_capability[i]);
         if (ret) {
             pr_info("pci_read_config_byte error: %d", i);
             pci_dev_put(pdev);
         }
     }
 
-    mc = (struct msi_capability *)config_space;
+    mc = (struct msi_capability *)msi_x_capability;
+
+    pr_info("capability id: 0x%02x\n", mc->capability_id);
+    pr_info("next cap ptr: 0x%02x\n", mc->next_cap_ptr);
+    pr_info("message control: 0x%02x\n", mc->message_control);
+
+    pr_info("msi-x tbl bir: 0x%01x\n", mc->tbl_bir_35 & 0x7);
+    tbl_addr_offset = (mc->tbl_bir_35) | (mc->tbl0 << 8U) | (mc->tbl1 << 16U);
+    pr_info("tbl address: 0x%08x\n", tbl_addr_offset);
+
+    pr_info("msi-x pba bir: 0x%01x\n", mc->pba_bir_35 & 0x7);
+    pba_addr_offset = (mc->pba_bir_35) | (mc->pba0 << 8U) | (mc->pba1 << 16U);
+    pr_info("pba address: 0x%08x\n", pba_addr_offset);
+
+    // bar_addr = pci_ioremap_bar(pdev, 0);
+    bar_addr = ioremap(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
+    if (bar_addr == NULL) {
+        pr_info("pci_ioremap_bar error\n");
+        pci_dev_put(pdev);
+    }
+
+    pr_info("bar_addr 0x%x\n", (unsigned int)bar_addr);
+
+    msi_x_size = 65;
+    for (i = 0; i < msi_x_size; i ++) {
+        msi_x_entry = (u32 *)(bar_addr + tbl_addr_offset + (i * MSI_X_ENTRY_SIZE));
+        lower_addr = msi_x_entry[0];
+        upper_addr = msi_x_entry[1];
+        g_msi_table[i] = (struct msi_entry *)msi_x_entry;
+        pr_info("lower_addr %x, upper_addr %x, vec_data %x, vec_control %x\n", lower_addr, upper_addr, msi_x_entry[2], msi_x_entry[3]);
+    }
+
+    ret = pci_read_config_byte(pdev, mc->next_cap_ptr, &next_capability_id);
+    if (ret) {
+        pr_info("pci_read_config_byte error: 0x%02x", mc->next_cap_ptr);
+        pci_dev_put(pdev);
+    }
+    return next_capability_id;
 }
 
 static int __init pci_config_rd_init(void)
@@ -133,17 +199,30 @@ static int __init pci_config_rd_init(void)
     //             config_space[i], config_space[i+1], config_space[i+2], config_space[i+3]);
     // }    
 
-    g_capability_addr = pc->capability_pointer;
-    pci_read_config_byte(pdev, pc->capability_pointer, &capability_id);
+    ret = pci_read_config_byte(pdev, pc->capability_pointer, &capability_id);
+    if (ret) {
+        pr_info("pci_read_config_byte error: 0x%02x", pc->capability_pointer);
+        pci_dev_put(pdev);
+    }
 
-
-    switch(capability_id) {
-        case MSI_X:
-            capability_id = parse_msi_x_structure();
-            break;
-        default:
-            pr_info("Can not recognize this capability_id: 0x%02x!\n", capability_id);
-            break;
+    while (1) {
+        switch(capability_id) {
+            case MSI_X:
+                capability_id = parse_msi_x_structure(pdev, pc->capability_pointer);
+                break;
+            case PMI:
+                capability_id = parse_pmi_structure(pdev, pc->capability_pointer);
+                break;
+            case PCII:
+                capability_id = parse_pcii_structure(pdev, pc->capability_pointer);
+                break;
+            default:
+                pr_info("Can not recognize this capability_id: 0x%02x!\n", capability_id);
+                goto br;
+                break;
+        }
+br:
+        break;
     }
 
     pci_dev_put(pdev);
