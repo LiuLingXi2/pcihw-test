@@ -12,6 +12,7 @@ MODULE_VERSION("1.0");
 
 #define ITS_BASE_ADDR 0x08080000
 #define TABLE_SIZE 0x2000
+#define GITS_BASE(n) (n)
 #define GITS_BASER(n) (0x100 + (n) * 8)
 
 #define NVME1_EVENTID 0x10
@@ -25,25 +26,39 @@ static void read_its_table(void)
     u64 device_table_addr, collec_table_addr;
     u32 device_table_size, collec_table_size;
     u64 device_table_entry;
+    u32 itt_addr;
 
     device_table_addr = readq(its_base + GITS_BASER(0)) & 0xfffffffff000;
     collec_table_addr = readq(its_base + GITS_BASER(1)) & 0xfffffffff000;
 
-    pr_info("device_table_addr: %x\n", device_table_addr);
-    pr_info("collec_table_addr: %x\n", collec_table_addr);
+    pr_info("device_table_addr: 0x%x\n", device_table_addr);
+    pr_info("collec_table_addr: 0x%x\n", collec_table_addr);
 
     device_table_size = readq(its_base + GITS_BASER(0)) & 0xff;
-    collec_table_size = readq(its_base + GITS_BASER(1)) & 0xff;
 
-    device_table = ioremap(device_table_addr, device_table_size);
+    pr_info("GITS_BASER0: 0x%x\n", readq(its_base + GITS_BASER(0)));
+
+    // 8 * 8192 = 64KB
+    // [    0.000000] ITS@0x0000000008080000: allocated 8192 Devices @42440000 (indirect, esz 8, psz 64K, shr 1)
+    device_table = memremap(device_table_addr, 8 * 8192, MEMREMAP_WB);
     if (device_table == NULL) {
         pr_info("device_table error!\n");
         return ;
     }
 
-    for (i == 0; i < NVME1_EVENTID; i ++) {
-        pr_info("itt_addr%d: %x\n", i, (unsigned int)device_table[i]);
+    for (i == 0; i < 1024; i ++) {
+        device_table_entry = readq((void __iomem *)(device_table + i));
+        if (i == 0) {
+            itt_addr = (device_table_entry & 0x0000ffffffff0000) >> 16;
+        }
+        if (device_table_entry != 0x0) {
+            pr_info("its addr%d: 0x%016llx\n", i, device_table_entry);
+        }
+        // pr_info("its addr%d: 0x%016llx\n", i, device_table_entry);
     }
+    pr_info("itt_addr 0x%016llx\n", itt_addr);
+
+
 }
 
 static int __init gic_its_init(void)

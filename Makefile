@@ -11,7 +11,7 @@ module:
 boot:
 	qemu-system-aarch64 \
 		-machine virt,gic-version=3 \
-		-cpu cortex-a72 -smp 4 -m 1G \
+		-cpu cortex-a72 -smp 4 -m 2G \
 		-device qemu-xhci,id=xhci \
 		-device pci-bridge,chassis_nr=1,id=pci.1 \
 		-device nvme,drive=nvme0n1,bus=pci.1,addr=0x4,serial="nvme-serial0" \
@@ -19,8 +19,9 @@ boot:
 		-device nvme,drive=nvme1n1,bus=pci.1,addr=0x5,serial="nvme-serial1" \
 		-drive file=nvme1n1.img,if=none,id=nvme1n1,format=raw \
 		-kernel Image \
-		-append "root=/dev/ram0 rdinit=/linuxrc console=ttyAMA0" \
+		-append "root=/dev/ram0 rdinit=/linuxrc console=ttyAMA0 iomem=relaxed" \
 		-initrd rootfs.img \
+		-d guest_errors \
 		-nographic
 
 .PHONY: initramfs _install
