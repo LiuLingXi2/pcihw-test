@@ -10,14 +10,25 @@ module:
 
 boot:
 	qemu-system-aarch64 \
-		-machine virt,gic-version=3 \
-		-cpu cortex-a72 -smp 4 -m 2G \
+		-machine virt,gic-version=3,iommu=smmuv3 \
+		-cpu cortex-a72 -smp 4 -m 3G \
 		-device qemu-xhci,id=xhci \
 		-device pci-bridge,chassis_nr=1,id=pci.1 \
 		-device nvme,drive=nvme0n1,bus=pci.1,addr=0x4,serial="nvme-serial0" \
 		-drive file=nvme0n1.img,if=none,id=nvme0n1,format=raw \
 		-device nvme,drive=nvme1n1,bus=pci.1,addr=0x5,serial="nvme-serial1" \
 		-drive file=nvme1n1.img,if=none,id=nvme1n1,format=raw \
+		-kernel Image \
+		-append "root=/dev/ram0 rdinit=/linuxrc console=ttyAMA0 iomem=relaxed" \
+		-initrd rootfs.img \
+		-d guest_errors \
+		-nographic
+
+smmu_boot:
+	qemu-system-aarch64 \
+		-machine virt,gic-version=3,iommu=smmuv3,kernel_irqchip=on \
+		-cpu cortex-a72 -smp 4 -m 3G \
+		-device usb-ehci,id=usb1,addr=0x2 \
 		-kernel Image \
 		-append "root=/dev/ram0 rdinit=/linuxrc console=ttyAMA0 iomem=relaxed" \
 		-initrd rootfs.img \

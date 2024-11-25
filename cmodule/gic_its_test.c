@@ -46,19 +46,17 @@ static void read_its_table(void)
         return ;
     }
 
-    for (i == 0; i < 1024; i ++) {
+    for (i == 0; i < 8192; i ++) {
         device_table_entry = readq((void __iomem *)(device_table + i));
         if (i == 0) {
-            itt_addr = (device_table_entry & 0x0000ffffffff0000) >> 16;
+            itt_addr = (device_table_entry & 0x0000ffffffff0000) >> 12;
         }
         if (device_table_entry != 0x0) {
             pr_info("its addr%d: 0x%016llx\n", i, device_table_entry);
         }
         // pr_info("its addr%d: 0x%016llx\n", i, device_table_entry);
     }
-    pr_info("itt_addr 0x%016llx\n", itt_addr);
-
-
+    pr_info("itt_addr0 0x%016llx\n", itt_addr << 8);
 }
 
 static int __init gic_its_init(void)
